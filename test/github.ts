@@ -1437,5 +1437,86 @@ describe('GitHub', () => {
       expect(isTransientGraphqlError({errors: []})).to.be.false;
       expect(isTransientGraphqlError({errors: [{}]})).to.be.false;
     });
+
+    it('should not treat a mixed response as transient', () => {
+      expect(
+        isTransientGraphqlError({
+          errors: [
+            {message: 'Something went wrong while executing your query.'},
+            {message: 'Resource not accessible by integration'},
+          ],
+        })
+      ).to.be.false;
+    });
+
+    it('should not treat a permanent error quoting a transient phrase as transient', () => {
+      expect(
+        isTransientGraphqlError({
+          errors: [
+            {
+              message:
+                'Variable $q is invalid: "Something went wrong while executing your query" is not allowed',
+            },
+          ],
+        })
+      ).to.be.false;
+      expect(
+        isTransientGraphqlError({
+          errors: [
+            {
+              message:
+                "Parse error near We couldn't respond to your request in time",
+            },
+          ],
+        })
+      ).to.be.false;
+    });
+
+    it('should treat all-transient errors as transient', () => {
+      expect(
+        isTransientGraphqlError({
+          errors: [
+            {message: 'Something went wrong while executing your query.'},
+            {
+              message:
+                "We couldn't respond to your request in time. Sorry about that.",
+            },
+          ],
+        })
+      ).to.be.true;
+    });
+
+    it('should accept a curly apostrophe in the timeout message', () => {
+      expect(
+        isTransientGraphqlError({
+          errors: [
+            {message: 'We couldn\u2019t respond to your request in time.'},
+          ],
+        })
+      ).to.be.true;
+    });
+
+    it('should accept real messages with a request ID suffix and padding', () => {
+      expect(
+        isTransientGraphqlError({
+          errors: [
+            {
+              message:
+                ' Something went wrong while executing your query. Please include `ABCD:1234` when reporting this issue.',
+            },
+          ],
+        })
+      ).to.be.true;
+    });
+
+    it('should not treat non-object error entries as transient', () => {
+      expect(
+        isTransientGraphqlError({
+          errors: ['Something went wrong while executing your query.'],
+        })
+      ).to.be.false;
+      expect(isTransientGraphqlError({errors: [null]})).to.be.false;
+      expect(isTransientGraphqlError({errors: [{message: 42}]})).to.be.false;
+    });
   });
 });

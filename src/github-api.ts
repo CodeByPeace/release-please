@@ -153,8 +153,8 @@ export const MAX_SLEEP_SECONDS = 20;
 
 const TRANSIENT_GRAPHQL_STATUSES = [500, 502, 503, 504];
 const TRANSIENT_GRAPHQL_MESSAGES = [
-  'something went wrong while executing your query',
-  'respond to your request in time',
+  /^something went wrong while executing your query/i,
+  /^we couldn['\u2019]t respond to your request in time/i,
 ];
 
 export function isTransientGraphqlError(err: unknown): boolean {
@@ -165,10 +165,15 @@ export function isTransientGraphqlError(err: unknown): boolean {
   if (typeof status === 'number') {
     return TRANSIENT_GRAPHQL_STATUSES.includes(status);
   }
+  // Every error must be a known transient one: a mixed response that also
+  // carries a permanent error (e.g. a permissions failure) must not be retried.
   return (
     Array.isArray(errors) &&
-    errors.some(e =>
-      TRANSIENT_GRAPHQL_MESSAGES.some(m => e.message?.toLowerCase().includes(m))
+    errors.length > 0 &&
+    errors.every(e =>
+      TRANSIENT_GRAPHQL_MESSAGES.some(m =>
+        m.test(typeof e?.message === 'string' ? e.message.trim() : '')
+      )
     )
   );
 }
